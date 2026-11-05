@@ -1,21 +1,31 @@
 # Android Sandbox on Firecracker
 
-Run Android 14 in a Firecracker microVM on an Apple Silicon Mac, then operate it two ways:
+Run Android 14 or 16 in a Firecracker microVM on an Apple Silicon Mac, then operate it two ways:
 
 - **WebVNC:** use the phone in your browser.
 - **MCP:** let an AI agent read the screen and tap, through a server running on the phone.
 
+[AI View Browser](#ai-view-browser) shows what an AI does through MCP, in plain language.
+
 ```
-Mac → Lima VM (nested KVM) → Firecracker → Android 14 (redroid)
-                                            ├─ droidVNC-NG → noVNC  → http://127.0.0.1:6080/
-                                            └─ MCP server  → socat  → http://127.0.0.1:8765/mcp
+Mac → Lima VM (nested KVM) → Firecracker → Android (redroid)
+                                            ├─ droidVNC-NG → noVNC  → WebVNC
+                                            └─ MCP server  → socat  → MCP
 ```
+
+| | Android 14 (default) | Android 16 |
+|---|---|---|
+| Start with | `./avm init` | `AVM_NAME=android-16 ./avm init` |
+| WebVNC | <http://127.0.0.1:6080/> | <http://127.0.0.1:6016/> |
+| MCP | <http://127.0.0.1:8765/mcp> | <http://127.0.0.1:8716/mcp> |
+| AI View Browser | <http://127.0.0.1:9765/> | <http://127.0.0.1:9716/> |
 
 ## Requirements
 
 - Mac with an M3 chip or newer (nested virtualization isn't available on M1 or M2)
-- About 40 GB of free disk space and 8 GB of free memory
+- About 40 GB of free disk space and 8 GB of free memory for each VM
 - [Lima](https://lima-vm.io): `brew install lima`
+- `python3`, only for AI View Browser
 
 ## Quick start
 
@@ -49,10 +59,13 @@ After that, `./avm up` boots Android in about 30 seconds.
 | `./avm mcp info` | Print the MCP URL, token and auth header, and check the server is reachable (`./avm mcp` does the same) |
 | `./avm mcp json [file]` | Print a ready-to-use MCP config, or write it to a private file |
 | `./avm mcp add [name]` | Register the server with Claude Code (default name: `android`) |
+| `./avm mcp view` | Start AI View Browser |
+
+These commands act on the Android 14 VM unless you set `AVM_NAME`. See [Android 16](#android-16).
 
 ## Android 16
 
-Android 16 runs in its own Lima VM, separate from the default Android 14 VM. Both can run at once.
+Android 16 runs in its own Lima VM, with its own kernel and disks, separate from the default Android 14 VM. Both can run at once. It's redroid's newest image; there is no Android 17 image yet.
 
 ```bash
 AVM_NAME=android-16 ./avm init
@@ -70,6 +83,10 @@ AVM_NAME=android-16-2 WEB_PORT=6017 MCP_PORT=8717 ./avm init
 ```
 
 Repeat all three settings on every `./avm` command for that VM.
+
+**Tested on Android 16:** boot, WebVNC with the cursor, MCP tool calls, and H.264 video in the WebView test browser.
+
+**Not tested on Android 16:** a fresh `init` from nothing, because the first VM was built step by step. Video in apps that decode through Android's codecs, such as Instagram, is also unverified.
 
 ## Using MCP
 
@@ -111,10 +128,13 @@ A page that explains, in plain Traditional Chinese, everything an AI does on the
 Keep it running and open http://127.0.0.1:9765/ (the MCP port plus 1000, or set `VIEW_PORT`). Then connect the AI through it:
 
 ```bash
-VIEW=1 ./avm mcp add android-view
+VIEW=1 ./avm mcp add android-view     # Claude Code
+VIEW=1 ./avm mcp json mcp.json        # other MCP clients
 ```
 
-An AI connected to the normal MCP port does not appear in the page.
+An AI connected to the normal MCP port does not appear in the page, so use the `android-view` server when you give it a task.
+
+For Android 16, put `AVM_NAME=android-16` before these commands and open http://127.0.0.1:9716/.
 
 | Part of the page | What it shows |
 |---|---|
@@ -139,7 +159,7 @@ Everything is reachable only from this Mac. Before making anything public:
 - **Leave the MCP app's built-in tunnel off.** It would expose the phone through a third party, so `start-mcp.sh` disables it.
 - **Don't sign in to real accounts.** An authenticated MCP client controls the whole device.
 
-The bearer token is created on first boot and stored in `~/fc/mcp-token` inside the Lima VM. To replace it:
+The bearer token is created on first boot and stored in `~/fc/mcp-token` inside the Lima VM, so each VM has its own. To replace it (for Android 16, use `android-16` and `AVM_NAME=android-16 ./avm up`):
 
 ```bash
 limactl shell android-fc bash -c 'rm ~/fc/mcp-token'
@@ -155,6 +175,8 @@ Then update your clients. For Claude Code, run `claude mcp remove android` and `
 | `AVM_NAME` | `android-fc` | Lima VM name. A name starting with `android-16` selects Android 16 |
 | `WEB_PORT` | `6080` (Android 16: `6016`) | WebVNC port on the Mac |
 | `MCP_PORT` | `8765` (Android 16: `8716`) | MCP port on the Mac |
+| `VIEW_PORT` | `MCP_PORT` + 1000 | AI View Browser port on the Mac |
+| `VIEW` | none | Set to `1` so `./avm mcp json` and `add` connect through AI View Browser |
 | `LIMA_CPUS`, `LIMA_MEMORY`, `LIMA_DISK` | `6`, `8`, `40` | Lima VM size |
 | `VCPUS`, `MEM_MIB` | `6`, `4096` | Android VM size |
 | `KERNEL_MIRROR` | none | Extra Linux kernel mirror to try first (Aliyun, Tsinghua and kernel.org are built in) |
@@ -167,7 +189,7 @@ Downloads are pinned by version and checksum. To start over with a clean phone, 
 ~/fc/repo/scripts/down.sh && RESET_DATA=1 ~/fc/repo/scripts/build-rootfs.sh
 ```
 
-To remove everything: `limactl delete -f android-fc`
+To remove everything: `limactl delete -f android-fc`, and the same for `android-16` if you created it.
 
 ## Why it's built this way
 
@@ -180,6 +202,8 @@ If boot slows down or the screen goes black, check these first:
 - **Firecracker runs under `setsid`.** It installs its own SIGHUP handler, so `nohup` alone lets a closing terminal shut the VM down.
 - **`gralloc-shim.c` makes video play.** redroid's software graphics module can't lock YUV buffers, so CPU decoders fail with `lockYCbCr` and `graphic view map failed`. The shim adds that function, without a GPU.
 - **The page draws its own cursor.** Android sends no pointer shape, so noVNC would hide it. `run-webvnc.sh` adds `novnc-cursor.js` to a copy of noVNC, and `show_touches` draws a mark on the phone at each touch.
+- **Android 16 needs device-mapper and writable loop mounts.** It mounts its APEX packages at boot and reboots with `bootstrap-apexd-failed` without them. See `kernel/android16.fragment`.
+- **Android 16 needs `ashmem-memfd-compat.patch`.** It only uses memfd if a memfd answers the ashmem ioctls, which Google's kernels provide and mainline Linux doesn't. Without the patch, graphics buffers can't be allocated and `surfaceflinger` crash-loops.
 
 ## Known limits
 
@@ -188,6 +212,9 @@ If boot slows down or the screen goes black, check these first:
 - 20 system apps are disabled to reduce load, including Bluetooth, Camera and Contacts. See `scripts/setup-android.sh`.
 - Non-fatal `fs-verity` and network statistics errors appear in the Android logs.
 - MCP v1.12.0 only binds to `127.0.0.1` or `0.0.0.0`. Here `0.0.0.0` covers only loopback and the private link to the Lima VM.
+- `android_press_key` with `ENTER` can fail with `No focused node` in web pages. Tap the on-screen keyboard's key instead.
+- Google can show a reCAPTCHA to automated searches. Solve it yourself in WebVNC; the 即時畫面 view in AI View Browser is read-only.
+- The WebView test browser left the page and returned to the home screen when opening a Threads post, and can't open `intent://` links. Firefox opened the same post, but no full browser is installed by default.
 
 ## Licences
 
