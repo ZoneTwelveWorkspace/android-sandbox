@@ -218,7 +218,8 @@ function renderStage() {
   let picked = null;
   if (sel) {
     if (stateOf(sel)) picked = { state: stateOf(sel), event: sel };
-    else picked = app.phase === "before" ? stateBefore(sel.id) || stateAfter(sel.id) : stateAfter(sel.id) || stateBefore(sel.id);
+    else if (app.phase === "before") picked = stateBefore(sel.id) || stateAfter(sel.id);
+    else picked = (app.follow ? latestState() : stateAfter(sel.id)) || stateBefore(sel.id);
   } else picked = latestState();
 
   stage.replaceChildren();
