@@ -25,7 +25,7 @@ cd android-sandbox
 ./avm init
 ```
 
-`init` creates the Lima VM, downloads and builds everything, and boots Android. Downloading and building took about 5 minutes on an M4, before the first boot. It's safe to rerun if a download fails, because finished steps are skipped.
+`init` creates the Lima VM, downloads and builds everything, and boots Android. The full run took about 6 minutes on an M4, including a first boot of about 50 seconds. It's safe to rerun if a download fails, because finished steps are skipped.
 
 When it finishes:
 
@@ -44,12 +44,22 @@ After that, `./avm up` boots Android in about 30 seconds.
 | `./avm status` | Show what is running, and the URLs |
 | `./avm shell` | Open a shell in the Lima VM |
 | `./avm adb <args>` | Run ADB against Android, for example `./avm adb shell getprop` |
-| `./avm mcp` | Print the MCP URL and bearer token |
+| `./avm mcp info` | Print the MCP URL, token and auth header, and check the server is reachable (`./avm mcp` does the same) |
+| `./avm mcp json [file]` | Print a ready-to-use MCP config, or write it to a private file |
 | `./avm mcp add [name]` | Register the server with Claude Code (default name: `android`) |
 
 ## Using MCP
 
-The server has 51 tools with the `android_` prefix, including `android_get_screen_state`, `android_tap` and `android_type_append_text`. Any MCP client can connect using Streamable HTTP and the bearer token:
+The server has 44 tools with the `android_` prefix, including `android_get_screen_state`, `android_tap` and `android_type_append_text`. Camera and location tools appear only if you grant the app those permissions.
+
+Any MCP client can connect using Streamable HTTP and the bearer token:
+
+```bash
+./avm mcp info              # URL, token and auth header
+./avm mcp json              # print the config below, with your token filled in
+./avm mcp json mcp.json     # write it to a file only you can read
+./avm mcp add               # or register it directly with Claude Code
+```
 
 ```json
 {
@@ -57,11 +67,13 @@ The server has 51 tools with the `android_` prefix, including `android_get_scree
     "android": {
       "type": "http",
       "url": "http://127.0.0.1:8765/mcp",
-      "headers": { "Authorization": "Bearer <token from ./avm mcp>" }
+      "headers": { "Authorization": "Bearer <your token>" }
     }
   }
 }
 ```
+
+`mcp.json` and `.mcp.json` are ignored by git because they contain the token.
 
 Screen text is untrusted input. An app or web page could show text that tries to steer the agent.
 
@@ -75,7 +87,14 @@ Everything is reachable only from this Mac. Before making anything public:
 - **Leave the MCP app's built-in tunnel off.** It would expose the phone through a third party, so `start-mcp.sh` disables it.
 - **Don't sign in to real accounts.** An authenticated MCP client controls the whole device.
 
-The bearer token is created on first boot and stored in `~/fc/mcp-token` inside the Lima VM. To replace it, delete that file and run `./avm up`, then rerun `./avm mcp add`.
+The bearer token is created on first boot and stored in `~/fc/mcp-token` inside the Lima VM. To replace it:
+
+```bash
+limactl shell android-fc bash -c 'rm ~/fc/mcp-token'
+./avm up
+```
+
+Then update your clients. For Claude Code, run `claude mcp remove android` and `./avm mcp add`. For a config file, rerun `./avm mcp json`.
 
 ## Settings
 

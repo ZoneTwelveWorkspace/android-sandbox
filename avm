@@ -33,6 +33,20 @@ sync_repo() {
   limactl copy -r "$ROOT/scripts" "$ROOT/guest" "$ROOT/kernel" "$NAME:$home/fc/repo/"
 }
 
+mcp_json() {
+  cat <<JSON
+{
+  "mcpServers": {
+    "android": {
+      "type": "http",
+      "url": "$1",
+      "headers": { "Authorization": "Bearer $2" }
+    }
+  }
+}
+JSON
+}
+
 urls() {
   echo; echo "WebVNC: http://127.0.0.1:$WEB_PORT/"; echo "MCP:    http://127.0.0.1:$MCP_PORT/mcp   (token: ./avm mcp)"
 }
@@ -60,14 +74,33 @@ case "${1:-help}" in
     shift; vm adb -s 172.30.0.2:5555 "$@" ;;
   mcp)
     TOKEN="$(vm bash -c 'cat ~/fc/mcp-token')"
-    if [ "${2:-}" = add ]; then
-      claude mcp add --transport http "${3:-android}" "http://127.0.0.1:$MCP_PORT/mcp" \
-        --header "Authorization: Bearer $TOKEN" >/dev/null
-      echo "added MCP server '${3:-android}' to Claude Code"
-    else
-      echo "URL:   http://127.0.0.1:$MCP_PORT/mcp"
-      echo "Token: $TOKEN"
-    fi ;;
+    URL="http://127.0.0.1:$MCP_PORT/mcp"
+    case "${2:-info}" in
+      add)
+        claude mcp add --transport http "${3:-android}" "$URL" \
+          --header "Authorization: Bearer $TOKEN" >/dev/null
+        echo "added MCP server '${3:-android}' to Claude Code" ;;
+      json)
+        JSON="$(mcp_json "$URL" "$TOKEN")"
+        if [ -n "${3:-}" ]; then
+          # The file holds the token, so only this user may read it.
+          (umask 077; rm -f "$3"; printf '%s\n' "$JSON" > "$3")
+          echo "wrote $3"
+        else
+          printf '%s\n' "$JSON"
+        fi ;;
+      info)
+        echo "URL:    $URL"
+        echo "Token:  $TOKEN"
+        echo "Header: Authorization: Bearer $TOKEN"
+        CODE="$(curl -s -o /dev/null -m 5 -w '%{http_code}' -X POST "$URL" -H "Authorization: Bearer $TOKEN" \
+          -H 'Content-Type: application/json' -H 'Accept: application/json, text/event-stream' \
+          -d '{"jsonrpc":"2.0","id":0,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"avm","version":"1"}}}' || true)"
+        if [ "$CODE" = 200 ]; then echo "Status: reachable, token accepted"
+        else echo "Status: not reachable (HTTP $CODE). Run ./avm up"; fi ;;
+      *)
+        echo "usage: ./avm mcp [info] | json [file] | add [name]"; exit 1 ;;
+    esac ;;
   *)
-    echo "usage: ./avm init | up | down | status | shell | adb <args> | mcp [add [name]]" ;;
+    echo "usage: ./avm init | up | down | status | shell | adb <args> | mcp [info | json [file] | add [name]]" ;;
 esac

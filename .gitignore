@@ -4,5 +4,7 @@
 *.tar.xz
 *.tgz
 mcp-token
+mcp.json
+.mcp.json
 .DS_Store
 android-mcp-report.md
