@@ -6,6 +6,16 @@
 
 `./avm mcp view` starts a local page that explains an AI's MCP calls in plain Traditional Chinese, with a wireframe of what it sees, the spot it touched, and the screen before and after each action. See `viewer/` and the README.
 
+**Tested on Android 16, with a script and the Google search below:** tap, swipe, scroll, element clicks, typing Chinese, failed calls, updates within about 2 seconds of each action, and refusing requests with no token or from other sites.
+
+**Not tested:** Android 14, a client connected with `VIEW=1 ./avm mcp add`, and the file, camera and clipboard tools.
+
+**Found while using it for a real Google search on Android 16:**
+
+- `android_press_key` with `ENTER` failed with `No focused node` in a web page. Tapping the on-screen key worked.
+- Google showed a reCAPTCHA, which a person has to solve in WebVNC.
+- The WebView test browser returned to the home screen when opening a Threads post, and can't open `intent://` links. Firefox, installed by hand, opened the same post.
+
 ### Android 16 runs in a separate VM
 
 `AVM_NAME=android-16 ./avm init` creates a second Lima VM with Android 16, on ports 6016 and 8716. The Android 14 VM keeps its own kernel and image.

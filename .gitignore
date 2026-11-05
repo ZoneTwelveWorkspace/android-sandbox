@@ -8,3 +8,4 @@ mcp.json
 .mcp.json
 .DS_Store
 android-mcp-report.md
+__pycache__/
