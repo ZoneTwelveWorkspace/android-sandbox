@@ -1,0 +1,16 @@
+# Persist logs to /data so a boot can be diagnosed offline even when the guest network is down.
+service fclog /system/bin/logcat -b all -v threadtime -f /data/fc-logcat.txt -r 16384 -n 3
+    user root
+    group root log
+    oneshot
+    disabled
+
+service fcwatch /system/bin/sh /vendor/bin/fc-watch.sh
+    user root
+    group root
+    oneshot
+    disabled
+
+on post-fs-data
+    start fclog
+    start fcwatch

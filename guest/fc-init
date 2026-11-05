@@ -1,0 +1,26 @@
+#!/fc/busybox sh
+# PID 1 shim: recreate what Docker gives a redroid container, then hand PID 1 to Android init.
+BB=/fc/busybox
+$BB mount -t proc proc /proc
+$BB mount -t sysfs sysfs /sys
+$BB mount -t devtmpfs devtmpfs /dev 2>/dev/null
+$BB mkdir -p /dev/pts /dev/shm /dev/mqueue
+$BB mount -t devpts -o newinstance,ptmxmode=0666,mode=0620 devpts /dev/pts
+$BB mount -t tmpfs tmpfs /dev/shm
+$BB mount -t mqueue mqueue /dev/mqueue
+$BB ln -sf /proc/self/fd /dev/fd
+$BB ln -sf /proc/self/fd/0 /dev/stdin
+$BB ln -sf /proc/self/fd/1 /dev/stdout
+$BB ln -sf /proc/self/fd/2 /dev/stderr
+$BB mount -t ext4 /dev/vdb /data || echo "fc-init: /data mount failed"
+$BB ip link set lo up
+$BB ip addr add 172.30.0.2/30 dev eth0
+$BB ip link set eth0 up
+$BB ip route add default via 172.30.0.1
+echo "fc-init: handing off to Android init"
+# redroid's init takes its options from argv (as under Docker), not from /proc/cmdline.
+ARGS=""
+for a in $($BB cat /proc/cmdline); do
+  case "$a" in androidboot.*) ARGS="$ARGS $a" ;; esac
+done
+exec /init qemu=1 $ARGS

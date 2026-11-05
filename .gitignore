@@ -1,0 +1,8 @@
+# Downloads, disks and secrets are created inside the Lima VM and never belong here.
+*.apk
+*.ext4
+*.tar.xz
+*.tgz
+mcp-token
+.DS_Store
+android-mcp-report.md

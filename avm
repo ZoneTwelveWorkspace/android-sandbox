@@ -1,0 +1,73 @@
+#!/bin/bash
+# Android-on-Firecracker control script for macOS. See README.md.
+set -euo pipefail
+NAME="${AVM_NAME:-android-fc}"; WEB_PORT="${WEB_PORT:-6080}"; MCP_PORT="${MCP_PORT:-8765}"
+ROOT="$(cd "$(dirname "$0")" && pwd)"
+
+status_of() { limactl list "$NAME" --format '{{.Status}}' 2>/dev/null || true; }
+vm() { limactl shell --workdir / "$NAME" "$@"; }
+in_vm() { vm env "WEB_PORT=$WEB_PORT" "MCP_PORT=$MCP_PORT" bash "$@"; }
+vm_home() { vm bash -c 'printf %s "$HOME"'; }
+
+preflight() {
+  [ "$(uname -s)-$(uname -m)" = Darwin-arm64 ] || { echo "needs an Apple Silicon Mac"; exit 1; }
+  command -v limactl >/dev/null || { echo "Lima is missing. Run: brew install lima"; exit 1; }
+  # Nested virtualization needs an M3 or newer chip.
+  case "$(sysctl -n machdep.cpu.brand_string)" in
+    *"M1"*|*"M2"*) echo "needs an M3 or newer chip for nested virtualization"; exit 1 ;;
+  esac
+}
+
+ensure_lima() {
+  case "$(status_of)" in
+    Running) ;;
+    Stopped) limactl start --tty=false "$NAME" ;;
+    *) limactl start --name="$NAME" --tty=false --vm-type=vz --nested-virt \
+         --cpus="${LIMA_CPUS:-6}" --memory="${LIMA_MEMORY:-8}" --disk="${LIMA_DISK:-40}" --mount-none template:ubuntu-24.04 ;;
+  esac
+}
+
+sync_repo() {
+  local home; home="$(vm_home)"
+  vm bash -c 'rm -rf ~/fc/repo; mkdir -p ~/fc/repo'
+  limactl copy -r "$ROOT/scripts" "$ROOT/guest" "$ROOT/kernel" "$NAME:$home/fc/repo/"
+}
+
+urls() {
+  echo; echo "WebVNC: http://127.0.0.1:$WEB_PORT/"; echo "MCP:    http://127.0.0.1:$MCP_PORT/mcp   (token: ./avm mcp)"
+}
+
+case "${1:-help}" in
+  init)
+    preflight; ensure_lima; sync_repo
+    in_vm "$(vm_home)/fc/repo/scripts/provision.sh"
+    in_vm "$(vm_home)/fc/repo/scripts/up.sh"
+    urls ;;
+  up)
+    ensure_lima; sync_repo
+    in_vm "$(vm_home)/fc/repo/scripts/up.sh"
+    urls ;;
+  down)
+    in_vm "$(vm_home)/fc/repo/scripts/down.sh" ;;
+  status)
+    echo "lima: $(status_of)"
+    [ "$(status_of)" = Running ] || exit 0
+    vm bash -c 'pgrep -x firecracker >/dev/null && echo "firecracker: running" || echo "firecracker: stopped"; echo "android boot_completed: $(timeout 5 adb -s 172.30.0.2:5555 shell getprop sys.boot_completed 2>/dev/null | tr -d "\r")"'
+    urls ;;
+  shell)
+    vm bash ;;
+  adb)
+    shift; vm adb -s 172.30.0.2:5555 "$@" ;;
+  mcp)
+    TOKEN="$(vm bash -c 'cat ~/fc/mcp-token')"
+    if [ "${2:-}" = add ]; then
+      claude mcp add --transport http "${3:-android}" "http://127.0.0.1:$MCP_PORT/mcp" \
+        --header "Authorization: Bearer $TOKEN" >/dev/null
+      echo "added MCP server '${3:-android}' to Claude Code"
+    else
+      echo "URL:   http://127.0.0.1:$MCP_PORT/mcp"
+      echo "Token: $TOKEN"
+    fi ;;
+  *)
+    echo "usage: ./avm init | up | down | status | shell | adb <args> | mcp [add [name]]" ;;
+esac
