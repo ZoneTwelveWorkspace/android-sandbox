@@ -1,12 +1,18 @@
 #!/bin/bash
 # Android-on-Firecracker control script for macOS. See README.md.
 set -euo pipefail
-NAME="${AVM_NAME:-android-fc}"; WEB_PORT="${WEB_PORT:-6080}"; MCP_PORT="${MCP_PORT:-8765}"
+NAME="${AVM_NAME:-android-fc}"
+# A name starting with android-16 is a separate Lima VM running Android 16, with its own ports, image and kernel.
+case "$NAME" in android-16*)
+  WEB_PORT="${WEB_PORT:-6016}"; MCP_PORT="${MCP_PORT:-8716}"; ANDROID16=1
+  REDROID_IMAGE="${REDROID_IMAGE:-docker.io/redroid/redroid@sha256:7b1e389bd15f37af3bcd06138f5b2ffa7cfba4332bd5ef54c53e99c2f160a15b}" ;;
+esac
+WEB_PORT="${WEB_PORT:-6080}"; MCP_PORT="${MCP_PORT:-8765}"
 ROOT="$(cd "$(dirname "$0")" && pwd)"
 
 status_of() { limactl list "$NAME" --format '{{.Status}}' 2>/dev/null || true; }
 vm() { limactl shell --workdir / "$NAME" "$@"; }
-in_vm() { vm env "WEB_PORT=$WEB_PORT" "MCP_PORT=$MCP_PORT" bash "$@"; }
+in_vm() { vm env "WEB_PORT=$WEB_PORT" "MCP_PORT=$MCP_PORT" ${REDROID_IMAGE:+"REDROID_IMAGE=$REDROID_IMAGE"} ${ANDROID16:+"ANDROID16=1"} bash "$@"; }
 vm_home() { vm bash -c 'printf %s "$HOME"'; }
 
 preflight() {
@@ -83,8 +89,15 @@ case "${1:-help}" in
     shift; vm adb -s 172.30.0.2:5555 "$@" ;;
   mcp)
     TOKEN="$(vm bash -c 'cat ~/fc/mcp-token')"
+    VIEW_PORT="${VIEW_PORT:-$((MCP_PORT + 1000))}"
     URL="http://127.0.0.1:$MCP_PORT/mcp"
+    # VIEW=1 points json and add at the AI View Browser, so that client's calls appear in it.
+    [ -z "${VIEW:-}" ] || URL="http://127.0.0.1:$VIEW_PORT/mcp"
     case "${2:-info}" in
+      view)
+        # The token goes through the environment so that it stays out of the process list.
+        MCP_VIEW_TOKEN="$TOKEN" exec python3 "$ROOT/viewer/server.py" --port "$VIEW_PORT" \
+          --upstream-port "$MCP_PORT" --web-port "$WEB_PORT" --name "$NAME" ;;
       add)
         claude mcp add --transport http "${3:-android}" "$URL" \
           --header "Authorization: Bearer $TOKEN" >/dev/null
@@ -108,8 +121,8 @@ case "${1:-help}" in
         if [ "$CODE" = 200 ]; then echo "Status: reachable, token accepted"
         else echo "Status: not reachable (HTTP $CODE). Run ./avm up"; fi ;;
       *)
-        echo "usage: ./avm mcp [info] | json [file] | add [name]"; exit 1 ;;
+        echo "usage: ./avm mcp [info] | json [file] | add [name] | view"; exit 1 ;;
     esac ;;
   *)
-    echo "usage: ./avm init | up | down | status | fps <1-60> | video-log [-d] | shell | adb <args> | mcp [info | json [file] | add [name]]" ;;
+    echo "usage: ./avm init | up | down | status | fps <1-60> | video-log [-d] | shell | adb <args> | mcp [info | json [file] | add [name] | view]" ;;
 esac

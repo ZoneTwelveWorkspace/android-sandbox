@@ -1,0 +1,54 @@
+--- a/mm/shmem.c
++++ b/mm/shmem.c
+@@ -76,6 +76,7 @@
+ #include <linux/magic.h>
+ #include <linux/syscalls.h>
+ #include <linux/fcntl.h>
++#include <linux/memfd.h>
+ #include <uapi/linux/memfd.h>
+ #include <linux/rmap.h>
+ #include <linux/uuid.h>
+@@ -5255,7 +5256,43 @@
+ 	.error_remove_folio = shmem_error_remove_folio,
+ };
+ 
++/*
++ * Android 16 only uses memfd for shared memory if a memfd also answers the ashmem ioctls, which Google's
++ * kernels provide and mainline does not. Without this it looks for /dev/ashmem and graphics buffers fail.
++ */
++static long shmem_ashmem_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
++{
++	const char *name = file_dentry(file)->d_name.name;
++	long seals;
++
++	if (_IOC_TYPE(cmd) != 0x77 || strncmp(name, "memfd:", 6))
++		return -ENOTTY;
++
++	switch (cmd) {
++	case _IOR(0x77, 2, char[256]):	/* ASHMEM_GET_NAME */
++		name += 6;
++		return copy_to_user((void __user *)arg, name, strlen(name) + 1) ? -EFAULT : 0;
++	case _IO(0x77, 4):		/* ASHMEM_GET_SIZE */
++		return i_size_read(file_inode(file));
++	case _IOW(0x77, 5, unsigned long):	/* ASHMEM_SET_PROT_MASK */
++		/* memfds stay readable and executable, so only write access can be removed. */
++		if (arg & PROT_WRITE)
++			return 0;
++		return memfd_fcntl(file, F_ADD_SEALS, F_SEAL_FUTURE_WRITE);
++	case _IO(0x77, 6):		/* ASHMEM_GET_PROT_MASK */
++		seals = memfd_fcntl(file, F_GET_SEALS, 0);
++		if (seals < 0)
++			return seals;
++		return PROT_READ | PROT_EXEC |
++		       (seals & (F_SEAL_WRITE | F_SEAL_FUTURE_WRITE) ? 0 : PROT_WRITE);
++	case _IOR(0x77, 11, unsigned long):	/* ASHMEM_GET_FILE_ID */
++		return put_user(file_inode(file)->i_ino, (unsigned long __user *)arg);
++	}
++	return -ENOTTY;
++}
++
+ static const struct file_operations shmem_file_operations = {
++	.unlocked_ioctl	= shmem_ashmem_ioctl,
+ 	.mmap		= shmem_mmap,
+ 	.open		= shmem_file_open,
+ 	.get_unmapped_area = shmem_get_unmapped_area,

@@ -41,7 +41,14 @@ fetch "https://github.com/bk138/droidVNC-NG/releases/download/$DROIDVNC_VER/droi
 fetch "https://github.com/danielealbano/android-remote-control-mcp/releases/download/$MCP_VER/android-remote-control-mcp-$MCP_VER-foss-release.apk" "$ASSETS/android-remote-control-mcp.apk" "$MCP_SHA"
 
 step "guest kernel"
-[ -s "$ASSETS/vmlinux-android" ] || bash "$HERE/build-kernel.sh" "$HERE/../kernel/android.fragment"
+if [ ! -s "$ASSETS/vmlinux-android" ]; then
+  if [ "${ANDROID16:-}" = 1 ]; then
+    cat "$HERE/../kernel/android.fragment" "$HERE/../kernel/android16.fragment" > "$ASSETS/android16.fragment"
+    bash "$HERE/build-kernel.sh" "$ASSETS/android16.fragment" "$HERE/../kernel/ashmem-memfd-compat.patch"
+  else
+    bash "$HERE/build-kernel.sh" "$HERE/../kernel/android.fragment"
+  fi
+fi
 
 step "redroid filesystem"
 if [ ! -x "$ROOTFS/init" ]; then

@@ -2,6 +2,26 @@
 
 ## 2026-11-05
 
+### AI View Browser
+
+`./avm mcp view` starts a local page that explains an AI's MCP calls in plain Traditional Chinese, with a wireframe of what it sees, the spot it touched, and the screen before and after each action. See `viewer/` and the README.
+
+### Android 16 runs in a separate VM
+
+`AVM_NAME=android-16 ./avm init` creates a second Lima VM with Android 16, on ports 6016 and 8716. The Android 14 VM keeps its own kernel and image.
+
+Android 16 needed three kernel changes that Android 14 does not, all in the Android 16 kernel only:
+
+| Boot failure | Cause | Fix |
+|---|---|---|
+| `bootstrap-apexd-failed`, device-mapper errors | Android 16 mounts its APEX packages at boot, and the kernel had no device-mapper | `kernel/android16.fragment`, plus a `/dev/device-mapper` link in `guest/fc-init` |
+| `bootstrap-apexd-failed`, `Can't open blockdev` | The kernel refused to mount loop devices that were open for writing | `CONFIG_BLK_DEV_WRITE_MOUNTED=y` |
+| `surfaceflinger` aborts with `output buffer not gpu writeable` | Android 16 only uses memfd if it answers ashmem ioctls, which mainline Linux does not provide, so graphics buffers could not be allocated | `kernel/ashmem-memfd-compat.patch` |
+
+**Tested on Android 16:** boot, WebVNC with the cursor, MCP tool calls, and a 384×176 H.264 video in the WebView test browser, which played to the end with the right picture and colours.
+
+**Not tested on Android 16:** a fresh `./avm init` from nothing (the VM was built step by step), and the gralloc shim's `lock_ycbcr`. The shim loads, but that video logged no call to it, so apps that decode through Android's codecs, such as Instagram, are unverified.
+
 ### Video plays without a GPU
 
 **Problem:** video did not play in any app that used Android's decoders. Decoding ran on the CPU, but every frame failed with:

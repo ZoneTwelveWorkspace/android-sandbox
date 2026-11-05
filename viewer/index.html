@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AI View Browser</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="top">
+  <div class="brand"><h1>AI View Browser</h1><span id="vm" class="muted"></span></div>
+  <div class="status" id="status" role="status"></div>
+</header>
+<main class="layout">
+  <section class="pane phone-pane" aria-label="手機畫面">
+    <div class="tabs" role="tablist" aria-label="畫面模式">
+      <button role="tab" data-mode="ai" aria-selected="true">AI 所見</button>
+      <button role="tab" data-mode="shot" aria-selected="false">截圖</button>
+      <button role="tab" data-mode="live" aria-selected="false">即時畫面</button>
+      <button id="refresh" class="ghost" title="重新讀取一次手機畫面">重新讀取</button>
+    </div>
+    <div class="phase" id="phase" hidden>
+      <button data-phase="before" aria-pressed="false">動作前</button>
+      <button data-phase="after" aria-pressed="true">動作後</button>
+    </div>
+    <div class="stage-wrap"><div class="stage" id="stage"></div></div>
+    <p class="caption" id="caption"></p>
+    <ul class="legend" id="legend">
+      <li><i class="k clk"></i>可點擊</li><li><i class="k edt"></i>可輸入</li><li><i class="k scr"></i>可捲動</li><li><i class="k txt"></i>文字</li>
+    </ul>
+  </section>
+  <section class="pane feed-pane" aria-label="AI 的操作">
+    <div class="pane-head"><h2>AI 做了什麼</h2>
+      <label class="follow"><input type="checkbox" id="follow" checked> 跟隨最新</label></div>
+    <ol class="feed" id="feed"></ol>
+  </section>
+  <section class="pane side-pane">
+    <div class="tabs" role="tablist" aria-label="右側內容">
+      <button role="tab" data-side="detail" aria-selected="true">這一步的細節</button>
+      <button role="tab" data-side="catalog" aria-selected="false">AI 能做的事</button>
+    </div>
+    <div class="side" id="side"></div>
+  </section>
+</main>
+<script src="tools.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

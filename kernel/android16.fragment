@@ -1,0 +1,15 @@
+# Android 16 mounts its APEX system modules at early boot, which Android 14's image does not need.
+CONFIG_MD=y
+CONFIG_BLK_DEV_DM=y
+CONFIG_DM_VERITY=y
+CONFIG_DM_CRYPT=y
+CONFIG_EROFS_FS=y
+CONFIG_EROFS_FS_XATTR=y
+CONFIG_EROFS_FS_ZIP=y
+CONFIG_EROFS_FS_ZIP_LZMA=y
+CONFIG_FS_VERITY=y
+CONFIG_CRYPTO_SHA256=y
+CONFIG_CRYPTO_LZ4=y
+CONFIG_CRYPTO_ZSTD=y
+# apexd keeps its loop devices open for writing while it mounts them; without this the mounts fail with EBUSY.
+CONFIG_BLK_DEV_WRITE_MOUNTED=y

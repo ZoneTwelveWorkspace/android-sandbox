@@ -1,7 +1,9 @@
 #!/bin/bash
 # Build a Firecracker 6.18 arm64 guest kernel with the Android fragment merged in.
+# Usage: build-kernel.sh <fragment> [source patch...]
 set -euo pipefail
-FRAGMENT="$(realpath "$1")"
+FRAGMENT="$(realpath "$1")"; shift
+PATCHES=(); for p in "$@"; do PATCHES+=("$(realpath "$p")"); done
 SRC="$HOME/fc/kernel"; OUT="$HOME/fc/assets"
 mkdir -p "$SRC" "$OUT"; cd "$SRC"
 VER="${KERNEL_VER:-6.18.60}"
@@ -20,6 +22,7 @@ done
 echo "checksum verified: $TARBALL"
 rm -rf "linux-$VER"; tar -xJf "$TARBALL"
 cd "linux-$VER"
+for p in ${PATCHES[@]+"${PATCHES[@]}"}; do patch -p1 --no-backup-if-mismatch < "$p"; done
 curl -fsSL -o .config https://raw.githubusercontent.com/firecracker-microvm/firecracker/v1.17.0/resources/guest_configs/microvm-kernel-ci-aarch64-6.18.config
 scripts/kconfig/merge_config.sh -m .config "$FRAGMENT" >/dev/null
 make ARCH=arm64 olddefconfig >/dev/null

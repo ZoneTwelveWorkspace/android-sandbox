@@ -12,6 +12,8 @@ $BB ln -sf /proc/self/fd /dev/fd
 $BB ln -sf /proc/self/fd/0 /dev/stdin
 $BB ln -sf /proc/self/fd/1 /dev/stdout
 $BB ln -sf /proc/self/fd/2 /dev/stderr
+# Android opens device-mapper at this path, while mainline kernels create /dev/mapper/control.
+[ -e /dev/mapper/control ] && $BB ln -sf /dev/mapper/control /dev/device-mapper
 $BB mount -t ext4 /dev/vdb /data || echo "fc-init: /data mount failed"
 $BB ip link set lo up
 $BB ip addr add 172.30.0.2/30 dev eth0

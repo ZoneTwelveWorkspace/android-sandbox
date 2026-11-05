@@ -50,6 +50,27 @@ After that, `./avm up` boots Android in about 30 seconds.
 | `./avm mcp json [file]` | Print a ready-to-use MCP config, or write it to a private file |
 | `./avm mcp add [name]` | Register the server with Claude Code (default name: `android`) |
 
+## Android 16
+
+Android 16 runs in its own Lima VM, separate from the default Android 14 VM. Both can run at once.
+
+```bash
+AVM_NAME=android-16 ./avm init
+```
+
+- WebVNC: http://127.0.0.1:6016/
+- MCP: http://127.0.0.1:8716/mcp
+
+Put `AVM_NAME=android-16` before every `./avm` command for this VM, for example `AVM_NAME=android-16 ./avm mcp info`.
+
+To run another Android 16 VM, use a different name that starts with `android-16`, and different ports:
+
+```bash
+AVM_NAME=android-16-2 WEB_PORT=6017 MCP_PORT=8717 ./avm init
+```
+
+Repeat all three settings on every `./avm` command for that VM.
+
 ## Using MCP
 
 The server has 44 tools with the `android_` prefix, including `android_get_screen_state`, `android_tap` and `android_type_append_text`. Camera and location tools appear only if you grant the app those permissions.
@@ -79,6 +100,35 @@ Any MCP client can connect using Streamable HTTP and the bearer token:
 
 Screen text is untrusted input. An app or web page could show text that tries to steer the agent.
 
+## AI View Browser
+
+A page that explains, in plain Traditional Chinese, everything an AI does on the phone through MCP.
+
+```bash
+./avm mcp view
+```
+
+Keep it running and open http://127.0.0.1:9765/ (the MCP port plus 1000, or set `VIEW_PORT`). Then connect the AI through it:
+
+```bash
+VIEW=1 ./avm mcp add android-view
+```
+
+An AI connected to the normal MCP port does not appear in the page.
+
+| Part of the page | What it shows |
+|---|---|
+| **AI 所見** | The list of screen elements, drawn as a wireframe, with the spot the AI touched marked |
+| **截圖** | The screenshot from that moment |
+| **即時畫面** | The phone now, through WebVNC, read-only |
+| **AI 做了什麼** | Each call as a sentence, with its result and duration |
+| **這一步的細節** | What the AI sent and what the phone returned |
+| **AI 能做的事** | Every tool on this phone, and how often it was used |
+
+After each action, the viewer reads the screen once more for the 動作後 view. The AI does not receive that copy, and the page says so.
+
+The viewer needs `python3` on the Mac. It listens on `127.0.0.1` only and refuses requests from other sites. It passes the token through without recording it, so an AI still needs the token. Calls and screenshots stay in memory until it stops, and they can include text the AI typed.
+
 ## Security
 
 Everything is reachable only from this Mac. Before making anything public:
@@ -102,9 +152,9 @@ Then update your clients. For Claude Code, run `claude mcp remove android` and `
 
 | Variable | Default | Purpose |
 |---|---|---|
-| `AVM_NAME` | `android-fc` | Lima VM name |
-| `WEB_PORT` | `6080` | WebVNC port on the Mac |
-| `MCP_PORT` | `8765` | MCP port on the Mac |
+| `AVM_NAME` | `android-fc` | Lima VM name. A name starting with `android-16` selects Android 16 |
+| `WEB_PORT` | `6080` (Android 16: `6016`) | WebVNC port on the Mac |
+| `MCP_PORT` | `8765` (Android 16: `8716`) | MCP port on the Mac |
 | `LIMA_CPUS`, `LIMA_MEMORY`, `LIMA_DISK` | `6`, `8`, `40` | Lima VM size |
 | `VCPUS`, `MEM_MIB` | `6`, `4096` | Android VM size |
 | `KERNEL_MIRROR` | none | Extra Linux kernel mirror to try first (Aliyun, Tsinghua and kernel.org are built in) |
