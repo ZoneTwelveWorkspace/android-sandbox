@@ -7,6 +7,7 @@ mkdir -p "$OUT"
 sudo mkdir -p "$ROOT/fc"
 sudo install -m755 "$(command -v busybox)" "$ROOT/fc/busybox"
 sudo install -m755 "$HERE/../guest/fc-init" "$ROOT/fc-init"
+bash "$HERE/build-gralloc-shim.sh"
 if [ "${DEBUG:-0}" = 1 ]; then
   sudo install -m644 "$HERE/../guest/fc-debug.rc" "$ROOT/vendor/etc/init/fc-debug.rc"
   sudo install -m755 "$HERE/../guest/fc-watch.sh" "$ROOT/vendor/bin/fc-watch.sh"

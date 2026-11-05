@@ -3,6 +3,10 @@
 set -euo pipefail
 FC="$HOME/fc"; RUN="$FC/run"; TAP=android-tap0
 VCPUS="${VCPUS:-6}"; MEM_MIB="${MEM_MIB:-4096}"; HUGE="${HUGE:-2M}"
+KERNEL="${KERNEL:-$FC/assets/vmlinux-android}"; GPU_MODE="${GPU_MODE:-guest}"
+# Screen refresh, 1 to 60. Set with ./avm fps; everything is drawn on the CPU, so lower it if the VM is overloaded.
+FPS="${FPS:-$(cat "$FC/fps" 2>/dev/null || echo 30)}"
+case "$FPS" in ([1-9]|[1-5][0-9]|60) ;; (*) echo "FPS must be 1 to 60, got $FPS"; exit 1 ;; esac
 mkdir -p "$RUN"
 pkill -f "firecracker --api-sock $RUN/fc.sock" 2>/dev/null || true
 rm -f "$RUN/fc.sock"
@@ -27,13 +31,13 @@ if [ "$HUGE" = 2M ]; then
 fi
 
 BOOT_ARGS="console=ttyS0 reboot=k panic=1 root=/dev/vda rw rootfstype=ext4 init=/fc-init selinux=0 psi=1 quiet loglevel=3 \
-androidboot.hardware=redroid androidboot.use_memfd=1 androidboot.redroid_gpu_mode=guest \
-androidboot.redroid_width=480 androidboot.redroid_height=854 androidboot.redroid_dpi=240 androidboot.redroid_fps=10 \
+androidboot.hardware=redroid androidboot.use_memfd=1 androidboot.redroid_gpu_mode=$GPU_MODE \
+androidboot.redroid_width=480 androidboot.redroid_height=854 androidboot.redroid_dpi=240 androidboot.redroid_fps=$FPS \
 androidboot.redroid_net_ndns=1 androidboot.redroid_net_dns1=8.8.8.8"
 
 cat > "$RUN/config.json" <<JSON
 {
-  "boot-source": {"kernel_image_path": "$FC/assets/vmlinux-android", "boot_args": "$BOOT_ARGS"},
+  "boot-source": {"kernel_image_path": "$KERNEL", "boot_args": "$BOOT_ARGS"},
   "drives": [
     {"drive_id": "rootfs", "path_on_host": "$FC/images/android-root.ext4", "is_root_device": true, "is_read_only": false},
     {"drive_id": "data", "path_on_host": "$FC/images/android-data.ext4", "is_root_device": false, "is_read_only": false}

@@ -42,6 +42,8 @@ After that, `./avm up` boots Android in about 30 seconds.
 | `./avm up` | Boot or reboot Android, and start WebVNC and MCP |
 | `./avm down` | Stop Android and keep the Lima VM running |
 | `./avm status` | Show what is running, and the URLs |
+| `./avm fps <1-60>` | Set the screen refresh rate and reboot (default 30) |
+| `./avm video-log [-d]` | Follow decoder and graphics logs, or print them and exit with `-d` |
 | `./avm shell` | Open a shell in the Lima VM |
 | `./avm adb <args>` | Run ADB against Android, for example `./avm adb shell getprop` |
 | `./avm mcp info` | Print the MCP URL, token and auth header, and check the server is reachable (`./avm mcp` does the same) |
@@ -126,6 +128,7 @@ If boot slows down or the screen goes black, check these first:
 - **`psi=1` is required.** Firecracker's kernel config turns PSI off by default, and `lmkd` crash-loops without it.
 - **droidVNC-NG replaces redroid's VNC server.** The built-in one fails with `error creating EGLImage: 0x300c` under software rendering.
 - **Firecracker runs under `setsid`.** It installs its own SIGHUP handler, so `nohup` alone lets a closing terminal shut the VM down.
+- **`gralloc-shim.c` makes video play.** redroid's software graphics module can't lock YUV buffers, so CPU decoders fail with `lockYCbCr` and `graphic view map failed`. The shim adds that function, without a GPU.
 - **The page draws its own cursor.** Android sends no pointer shape, so noVNC would hide it. `run-webvnc.sh` adds `novnc-cursor.js` to a copy of noVNC, and `show_touches` draws a mark on the phone at each touch.
 
 ## Known limits

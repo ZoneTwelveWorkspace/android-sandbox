@@ -68,6 +68,15 @@ case "${1:-help}" in
     [ "$(status_of)" = Running ] || exit 0
     vm bash -c 'pgrep -x firecracker >/dev/null && echo "firecracker: running" || echo "firecracker: stopped"; echo "android boot_completed: $(timeout 5 adb -s 172.30.0.2:5555 shell getprop sys.boot_completed 2>/dev/null | tr -d "\r")"'
     urls ;;
+  fps)
+    case "${2:-}" in ([1-9]|[1-5][0-9]|60) ;; (*) echo "usage: ./avm fps <1-60>"; exit 1 ;; esac
+    ensure_lima; sync_repo
+    vm bash -c "echo $2 > ~/fc/fps"
+    in_vm "$(vm_home)/fc/repo/scripts/up.sh"
+    urls ;;
+  video-log)
+    # Decoder, buffer and shim messages. Add -d to print what is already logged and exit; otherwise it follows live.
+    vm adb -s 172.30.0.2:5555 logcat ${2:-} -v time | grep -E --line-buffered 'FCGralloc|C2AllocatorGralloc|C2Soft|graphic view|lockYCbCr|MediaCodec.*(rror|ailed)|CCodec.*(rror|ailed)|F/libc|Abort message' ;;
   shell)
     vm bash ;;
   adb)
@@ -102,5 +111,5 @@ case "${1:-help}" in
         echo "usage: ./avm mcp [info] | json [file] | add [name]"; exit 1 ;;
     esac ;;
   *)
-    echo "usage: ./avm init | up | down | status | shell | adb <args> | mcp [info | json [file] | add [name]]" ;;
+    echo "usage: ./avm init | up | down | status | fps <1-60> | video-log [-d] | shell | adb <args> | mcp [info | json [file] | add [name]]" ;;
 esac
