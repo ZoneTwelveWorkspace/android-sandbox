@@ -126,7 +126,7 @@ If boot slows down or the screen goes black, check these first:
 - **`psi=1` is required.** Firecracker's kernel config turns PSI off by default, and `lmkd` crash-loops without it.
 - **droidVNC-NG replaces redroid's VNC server.** The built-in one fails with `error creating EGLImage: 0x300c` under software rendering.
 - **Firecracker runs under `setsid`.** It installs its own SIGHUP handler, so `nohup` alone lets a closing terminal shut the VM down.
-- **The cursor comes from a patched noVNC copy.** Android sends no pointer shape, so noVNC would hide it. `run-webvnc.sh` keeps your normal arrow, and `show_touches` draws a mark on the phone at each touch.
+- **The page draws its own cursor.** Android sends no pointer shape, so noVNC would hide it. `run-webvnc.sh` adds `novnc-cursor.js` to a copy of noVNC, and `show_touches` draws a mark on the phone at each touch.
 
 ## Known limits
 
